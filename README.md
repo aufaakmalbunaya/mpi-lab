@@ -4,7 +4,7 @@ Hands-on exercises for learning **message-passing parallel programming in C** us
 
 Each program in this repository is a complete, self-contained exercise that demonstrates one core MPI concept — from basic rank/memory semantics through point-to-point protocols, collective operations, nonblocking communication, and parallel numerical integration.
 
-📄 The full tutorial is included in this repository: **[`Tutorial MPI.pdf`](./Tutorial%20MPI.pdf)**
+📄 The full tutorial is included in this repository: **[`Tutorial MPI.pdf`](./docs/Tutorial%20MPI.pdf)**
 
 ---
 
@@ -12,6 +12,7 @@ Each program in this repository is a complete, self-contained exercise that demo
 
 - [Requirements](#requirements)
 - [Installation](#installation)
+- [Repository layout](#repository-layout)
 - [Building the programs](#building-the-programs)
 - [Running the programs](#running-the-programs)
 - [The exercises](#the-exercises)
@@ -68,39 +69,57 @@ What each piece provides:
 
 > ⚠️ Run MPI programs as your **normal user** — do not put `sudo` before `mpirun`.
 
+## Repository layout
+
+```
+mpi-lab/
+├── src/                  C sources for all 8 exercises
+├── bin/                  compiled executables (build output)
+├── docs/                 Tutorial MPI.pdf
+├── Makefile              builds every program from src/ into bin/
+└── README.md
+```
+
 ## Building the programs
 
-Every `.c` file compiles to its own executable. The tutorial uses consistent flags:
+The included `Makefile` builds all eight programs from `src/` into `bin/`:
 
 ```bash
-mpicc -std=c11 -O2 -Wall -Wextra <source>.c -o <program>
+make            # build all programs
+make hello      # build one program
+make list       # list available programs
+make clean      # remove compiled binaries
+```
+
+Or compile a single program manually — every `.c` file is self-contained:
+
+```bash
+mpicc -std=c11 -O2 -Wall -Wextra src/<source>.c -o bin/<program>
 ```
 
 Example:
 
 ```bash
-mpicc -std=c11 -O2 -Wall -Wextra hello.c -o hello
+mpicc -std=c11 -O2 -Wall -Wextra src/hello.c -o bin/hello
 ```
 
-Precompiled binaries for aarch64 Linux are also present in this repository, but you should rebuild them for your own platform.
+Precompiled binaries for aarch64 Linux are already present in `bin/`, but you should rebuild them for your own platform.
 
 ## Running the programs
 
 ```bash
-mpirun -np <processes> ./<program> [args]
+mpirun -np <processes> bin/<program> [args]
 ```
 
 Useful options:
 
 ```bash
 # More processes than available slots (functional testing on a small VM):
-mpirun --oversubscribe -np 4 ./hello
+mpirun --oversubscribe -np 4 bin/hello
 
 # Launch across multiple hosts (optional advanced exercise):
-mpirun --hostfile hosts.txt -np 4 ./hello
+mpirun --hostfile hosts.txt -np 4 bin/hello
 ```
-
----
 
 ---
 
@@ -113,10 +132,10 @@ mpirun --hostfile hosts.txt -np 4 ./hello
 Demonstrates that `mpirun -np N` starts N processes running the same program, each with its own rank and its own private copy of every variable. Rank 0 sets `x = 100`; other ranks keep `x = 0`.
 
 ```bash
-mpicc -std=c11 -O2 -Wall -Wextra hello.c -o hello
-mpirun -np 1 ./hello
-mpirun -np 2 ./hello
-mpirun -np 4 ./hello
+mpicc -std=c11 -O2 -Wall -Wextra src/hello.c -o bin/hello
+mpirun -np 1 bin/hello
+mpirun -np 2 bin/hello
+mpirun -np 4 bin/hello
 ```
 
 Sample output (order is **not** guaranteed — independent processes and output forwarding affect line order):
@@ -143,8 +162,8 @@ rank=1 size=4 host=ubuntu x=0
 Rank 0 sends `21` with tag `10`; rank 1 receives it, doubles it, and returns `42` with tag `20`. Requires **exactly 2 processes**.
 
 ```bash
-mpicc -std=c11 -O2 -Wall -Wextra request_reply.c -o request_reply
-mpirun -np 2 ./request_reply
+mpicc -std=c11 -O2 -Wall -Wextra src/request_reply.c -o bin/request_reply
+mpirun -np 2 bin/request_reply
 ```
 
 Expected output:
@@ -170,8 +189,8 @@ Rank 0 sent 21 and received 42
 Every rank sends its rank number to its right neighbor and receives from its left neighbor, using `MPI_Sendrecv` — a single blocking call combining send and receive. With 4 ranks the logical ring is `0 → 1 → 2 → 3 → 0`, so ranks 0, 1, 2, 3 receive values 3, 0, 1, 2 respectively.
 
 ```bash
-mpicc -std=c11 -O2 -Wall -Wextra ring.c -o ring
-mpirun -np 4 ./ring
+mpicc -std=c11 -O2 -Wall -Wextra src/ring.c -o bin/ring
+mpirun -np 4 bin/ring
 ```
 
 **Why deadlock happens:** if both processes call `MPI_Recv` first, neither reaches its send and both wait forever. Simply reversing the order is *not* a general fix — small messages may appear to work due to buffering, while other sizes or implementations hang. `MPI_Sendrecv` avoids the problem by handling the pairing internally; separate send/receive calls still suit one-way transfers and request–reply protocols.
@@ -187,8 +206,8 @@ mpirun -np 4 ./ring
 Rank 0 selects `iterations = 1000`; every rank needs the same value.
 
 ```bash
-mpicc -std=c11 -O2 -Wall -Wextra broadcast.c -o broadcast
-mpirun -np 4 ./broadcast
+mpicc -std=c11 -O2 -Wall -Wextra src/broadcast.c -o bin/broadcast
+mpirun -np 4 bin/broadcast
 ```
 
 **Collective rules:**
@@ -216,9 +235,9 @@ MPI_Bcast(&value, 1, MPI_INT, 0, MPI_COMM_WORLD);
 Rank 0 owns the array `[1..12]`, scatters equal blocks, each rank sums its block, then rank 0 gathers the partial sums **and** computes the reduced total.
 
 ```bash
-mpicc -std=c11 -O2 -Wall -Wextra scatter_sum.c -o scatter_sum
-mpirun -np 4 ./scatter_sum
-mpirun -np 3 ./scatter_sum
+mpicc -std=c11 -O2 -Wall -Wextra src/scatter_sum.c -o bin/scatter_sum
+mpirun -np 4 bin/scatter_sum
+mpirun -np 3 bin/scatter_sum
 ```
 
 Expected output for 4 processes:
@@ -246,8 +265,8 @@ Reduced total: 78
 Each rank holds `local = rank + 1.0`; all ranks end up with the same global sum and mean. There is **no root argument**.
 
 ```bash
-mpicc -std=c11 -O2 -Wall -Wextra allreduce.c -o allreduce
-mpirun -np 4 ./allreduce
+mpicc -std=c11 -O2 -Wall -Wextra src/allreduce.c -o bin/allreduce
+mpirun -np 4 bin/allreduce
 ```
 
 With 4 ranks every rank prints `sum=10.0 mean=2.5`.
@@ -265,8 +284,8 @@ With 4 ranks every rank prints `sum=10.0 mean=2.5`.
 The same ring exchange as Exercise 3, but nonblocking: both operations are posted, independent work runs while they are in flight, then `MPI_Waitall` completes them.
 
 ```bash
-mpicc -std=c11 -O2 -Wall -Wextra nonblocking_ring.c -o nonblocking_ring
-mpirun -np 4 ./nonblocking_ring
+mpicc -std=c11 -O2 -Wall -Wextra src/nonblocking_ring.c -o bin/nonblocking_ring
+mpirun -np 4 bin/nonblocking_ring
 ```
 
 The received values match Exercise 3.
@@ -292,12 +311,12 @@ The received values match Exercise 3.
 Each index is one independent function evaluation. Ranks get contiguous index ranges and reduce their partial sums.
 
 ```bash
-mpicc -std=c11 -O2 -Wall -Wextra pi_mpi.c -o pi_mpi
-mpirun -np 4 ./pi_mpi 10000000
-mpirun -np 1 ./pi_mpi 10000000
+mpicc -std=c11 -O2 -Wall -Wextra src/pi_mpi.c -o bin/pi_mpi
+mpirun -np 4 bin/pi_mpi 10000000
+mpirun -np 1 bin/pi_mpi 10000000
 ```
 
-Usage: `./pi_mpi [N: 1..1000000000]` — defaults to `N = 10000000`.
+Usage: `bin/pi_mpi [N: 1..1000000000]` — defaults to `N = 10000000`.
 
 Expected result: `pi ≈ 3.141592653589793`. The last digits may vary with process count because floating-point addition is not exactly associative. For `N = 1` the estimate is exactly `3.2` in real arithmetic — useful for checking the partition, not accuracy.
 
@@ -335,9 +354,9 @@ lscpu
 mpirun --version
 
 # One warm-up and five measured runs with two ranks:
-mpirun -np 2 ./pi_mpi 10000000
+mpirun -np 2 bin/pi_mpi 10000000
 for trial in 1 2 3 4 5; do
-    mpirun -np 2 ./pi_mpi 10000000
+    mpirun -np 2 bin/pi_mpi 10000000
 done
 ```
 
@@ -397,21 +416,23 @@ From Section 15 of the tutorial — good extensions once the main exercises pass
 
 | File | Description |
 |---|---|
-| `hello.c` | Ranks, size, hostname, private memory (Exercise 1) |
-| `request_reply.c` | Blocking send/receive request–reply (Exercise 2) |
-| `ring.c` | Ring exchange with `MPI_Sendrecv` (Exercise 3) |
-| `broadcast.c` | `MPI_Bcast` configuration sharing (Exercise 4) |
-| `scatter_sum.c` | `MPI_Scatter` / `MPI_Gather` / `MPI_Reduce` (Exercise 5) |
-| `allreduce.c` | `MPI_Allreduce` global result (Exercise 6) |
-| `nonblocking_ring.c` | `MPI_Irecv` / `MPI_Isend` / `MPI_Waitall` (Exercise 7) |
-| `pi_mpi.c` | Parallel π via midpoint rule + timing (Exercise 8) |
-| `Tutorial MPI.pdf` | Full tutorial document |
+| `src/hello.c` | Ranks, size, hostname, private memory (Exercise 1) |
+| `src/request_reply.c` | Blocking send/receive request–reply (Exercise 2) |
+| `src/ring.c` | Ring exchange with `MPI_Sendrecv` (Exercise 3) |
+| `src/broadcast.c` | `MPI_Bcast` configuration sharing (Exercise 4) |
+| `src/scatter_sum.c` | `MPI_Scatter` / `MPI_Gather` / `MPI_Reduce` (Exercise 5) |
+| `src/allreduce.c` | `MPI_Allreduce` global result (Exercise 6) |
+| `src/nonblocking_ring.c` | `MPI_Irecv` / `MPI_Isend` / `MPI_Waitall` (Exercise 7) |
+| `src/pi_mpi.c` | Parallel π via midpoint rule + timing (Exercise 8) |
+| `bin/` | Compiled executables (aarch64 Linux) |
+| `docs/Tutorial MPI.pdf` | Full tutorial document |
+| `Makefile` | Builds every program from `src/` into `bin/` |
 | `README.md` | This file |
 
 ---
 
 ## References
 
-- *MPI Programming Tutorial — Parallel Programming on Your Own Laptop*, Department of Computer Science and Electronics, Universitas Gadjah Mada (included as `Tutorial MPI.pdf`)
+- *MPI Programming Tutorial — Parallel Programming on Your Own Laptop*, Department of Computer Science and Electronics, Universitas Gadjah Mada (included as `docs/Tutorial MPI.pdf`)
 - MPI Forum: MPI standard — <https://www.mpi-forum.org/>
 - Open MPI documentation — <https://www.open-mpi.org/doc/>
